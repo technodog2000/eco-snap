@@ -1,0 +1,103 @@
+import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLabel, QVBoxLayout, QWidget, QFileDialog
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtCore import Qt
+import requests
+import base64
+import io
+from PIL import Image
+import json
+import openai
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.title = "Open File"
+        self.top = 100
+        self.left = 100
+        self.width = 800
+        self.height = 600
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle(self.title)
+        self.setGeometry(self.top, self.left, self.width, self.height)
+        self.setStyleSheet("QMainWindow {background: 'white';}")
+
+        # Main layout
+        self.central_widget = QWidget()
+        self.layout = QVBoxLayout(self.central_widget)
+        self.setCentralWidget(self.central_widget)
+
+        # File open button
+        self.button = QPushButton("Open Image", self)
+        self.button.clicked.connect(self.file_retrieve)
+        self.layout.addWidget(self.button)
+
+        # Label for displaying images
+        self.label = QLabel(self)
+        self.layout.addWidget(self.label)
+
+        # Label for displaying results
+        self.result_label = QLabel(self)
+        self.result_label.setWordWrap(True)
+        self.layout.addWidget(self.result_label)
+
+    def file_retrieve(self):
+        file_name, _ = QFileDialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg)")
+        if file_name:
+            self.display_image(file_name)
+            self.process_image(file_name)
+
+    def display_image(self, file_path):
+        pixmap = QPixmap(file_path)
+        pixmap = pixmap.scaled(100, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.label.setPixmap(pixmap)
+
+    def process_image(self, file_path):
+        image = Image.open(file_path).convert("RGB")
+        buffered = io.BytesIO()
+        image.save(buffered, quality=90, format="JPEG")
+        base64_string = base64.b64encode(buffered.getvalue()).decode("ascii")
+        self.perform_api_call(base64_string)
+    # ... [Continuation from the previous part] ...
+
+    def perform_api_call(self, base64_string):
+        try:
+            payload = {
+                "base64str": base64_string,
+                "model_id": '21af3472-6b14-4c84-9844-0eb8868a65ee',
+                "conf_thresh": 0.4,
+                "nms_thresh": 0.45
+            }
+            api_url = 'https://apiv2.chooch.ai/predict?api_key=e27d9f14-e7ab-4a03-a501-3f4233b42c41'
+            response = requests.put(api_url, data=json.dumps(payload))
+            if response.status_code == 200:
+                json_data = json.loads(response.content)
+                la_lista = [f"I think there is a {i['class_title']} with certainty {i['score']} and/or" for i in json_data["predictions"]]
+                self.get_openai_response(la_lista)
+            else:
+                self.result_label.setText("Error in API response.")
+        except Exception as e:
+            self.result_label.setText(f"An error occurred: {str(e)}")
+
+    def get_openai_response(self, la_lista):
+        response = openai.chat.completions.create(
+            model="gpt-4-1106-preview",
+            messages=[
+                {"role": "system", "content": "You are a carbon emmisions calculator. The user will give you a descriptions of 1 or more items and you will have to provide the emmisions for each item. Take into account that the words in between I think there are and and/or relate to a single item and are only describing it - they are not each individual items eg. chicken burger sandwich burger all mean the same. Only respond with a list format of each item - CO2 Emissions per annum in kg - eco alternative"},
+                {"role": "user", "content": f"{la_lista} tell me the emmisions on average over a year for each described item and put it in a ordered list. "}
+            ]
+        )
+
+        self.display_results(response.choices[0].message.content)
+
+    def display_results(self, content):
+        self.result_label.setText(content)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    openai.api_key = "YOUR_API_KEY_HERE"
+    mainWin = MainWindow()
+    mainWin.show()
+    sys.exit(app.exec_())

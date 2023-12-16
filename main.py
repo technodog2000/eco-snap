@@ -16,7 +16,7 @@ win.title("open file")
 win.minsize(1,400)
 win.config(padx=20,pady=20)
 win.maxsize(800,900)
-openai.api_key = api_key = "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"
+openai.api_key = api_key = "YOUR_API"
 
 def file_retrieve():
     global win, newwin, buttony, brrr, br, image, buffered, base64_string, payload, api_url, response, json_data, la_lista, rhino

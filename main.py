@@ -82,7 +82,7 @@ def file_retrieve():
     print(response.choices[0].message.content)
     global labela
     labela = ttk.Label(text=response.choices[0].message.content, font=("Arial", 8),master=newwin,wraplength=270)
-    labela.grid(row=1,column=1)
+    labela.grid(row=1,column=0)
 
     title = ttk.Label(text="Results",font=("Arial",40),master=newwin)
     title.grid(row=0,column=0)
